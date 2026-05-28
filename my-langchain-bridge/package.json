@@ -1,0 +1,8 @@
+{
+  "name": "my-langchain-bridge",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@lmstudio/sdk": "^1.5.0"
+  }
+}

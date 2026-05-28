@@ -1,0 +1,13 @@
+{
+  "id": "my-langchain-bridge",
+  "name": "langchain-bridge",
+  "type": "plugin",
+  "owner": "local",
+  "version": "1.0.0",
+  "description": "Bridges LM Studio UI to a local LangChain FastAPI backend",
+  "runner": "node",
+  "entry": "src/index.ts",
+  "features": [
+    "generator"
+  ]
+}
