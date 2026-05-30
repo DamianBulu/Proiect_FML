@@ -6,12 +6,23 @@ export async function main(context: PluginContext) {
     console.log("Chat history:", chat.map((msg) => msg.getText()).join("\n---\n"));
     const lastUserMessage = chat.at(-1).getText();
 
+    // Build the full chat history as an array of {role, content} objects
+    // so the LangChain backend can take conversational context into account.
+    const chatHistory = chat.map((msg) => ({
+      role: msg.getRole(),
+      content: msg.getText(),
+    }));
+
     try {
-      // Send it to your running Python FastAPI backend
+      // Send both the latest prompt and the full chat history
+      // to the running Python FastAPI backend
       const response = await fetch("http://127.0.0.1:8000/generate-stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: lastUserMessage }),
+        body: JSON.stringify({
+          prompt: lastUserMessage,
+          chat_history: chatHistory,
+        }),
       });
 
       if (!response.body) {

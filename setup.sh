@@ -25,7 +25,7 @@ echo "Upgrading pip..."
 pip install --upgrade pip
 
 echo "Installing FastAPI, Uvicorn, and LangChain ecosystem..."
-pip install fastapi uvicorn pydantic langchain-core langchain-openai httpx
+pip install fastapi uvicorn pydantic langchain-core langchain-openai langgraph httpx
 
 # -----------------------------------------------------------
 # 2. LM Studio Plugin Dependencies Setup
