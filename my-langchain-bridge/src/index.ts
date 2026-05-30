@@ -3,7 +3,7 @@ import { type PluginContext } from "@lmstudio/sdk";
 export async function main(context: PluginContext) {
   // Use the native SDK builder method to hook up your custom text generation pipeline
   context.withGenerator(async (ctl, chat) => {
-    // Grab the last message the user typed into the UI
+    console.log("Chat history:", chat.map((msg) => msg.getText()).join("\n---\n"));
     const lastUserMessage = chat.at(-1).getText();
 
     try {
