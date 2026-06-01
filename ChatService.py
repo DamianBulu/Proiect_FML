@@ -212,7 +212,6 @@ def generate_advice(state: AgentState) -> dict:
 
 
 def judge_advice(state: AgentState) -> dict:
-
     #1.Strict System Prompt for the Judge
     judge_template="""You are a medical safety auditor (Judge).
         Your task is to evaluate the advice given by a virtual assistant (Advisor) to a patient.
