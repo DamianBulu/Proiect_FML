@@ -11,7 +11,7 @@ class UserKnowledgeRepo():
 
 
     def get_knowledge(self, query=None):
-        "Reads all the pacient history and format it as text for Advisor"
+        """Reads all the pacient history and format it as text for Advisor"""
         if not os.path.exists(self.filepath):
             return "No available data for the patient"
         with open(self.filepath, "r",encoding="utf-8") as f:
@@ -24,7 +24,7 @@ class UserKnowledgeRepo():
         return "\n".join(f"-{item}" for item in data)
 
     def save_knowledge(self, new_info:str):
-        "Save new information in the patient profile"
+        """Save new information in the patient profile"""
         #Evităm salvarea dacă modelul a spus că nu a găsit date utile
         if not new_info or new_info.strip()=="" or "No new medical data" in new_info:
             return

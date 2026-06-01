@@ -3,7 +3,6 @@ from typing import TypedDict, List
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from pydantic.v1.class_validators import extract_root_validators
 
 from AdvisorModel import AdvisorModel
 from AnalyserModel import AnalyserModel
@@ -38,10 +37,6 @@ class AgentState(TypedDict):
     final_response: str
 
 def classify_message(state: AgentState) -> dict:
-    # message_type = analyserModel.getResponse(state["message"]) #something like this
-    # # can be "store_data" | "medical_advice" | "both" | "neither"
-    # return {"message_type": message_type}
-
     #Strict System Prompt for Intent Classification(Triage)
     system_template="""You are a triage assistant in a medical application.
         Your job is to analyze the user's message and determine their intent.
@@ -115,10 +110,6 @@ def prepare_retrieval(state: AgentState) -> dict:
     return {}
 
 def extract_user_info(state: AgentState) -> dict:
-    # extracted = analyserModel.getResponse("I think I'm dead")
-    # return {"extracted_user_info": extracted}
-
-
     #System Propmpt for Data Extraction
     system_template="""You are a medical data extraction specialist.
         Your job is to extract relevant personal and medical information from the user's message so it can be saved to their long-term health profile.
@@ -148,10 +139,6 @@ def extract_user_info(state: AgentState) -> dict:
     return {"extracted_user_info":extracted_info}
 
 def store_user_context(state: AgentState) -> dict:
-    # userRepo.save_knowledge("knowledge")
-    # return {}
-
-
     #Luăm informația extrasă de Analyser la pasul anterior
     extracted_info=state.get("extracted_user_info","")
 
@@ -167,24 +154,11 @@ def retrieve_user_context(state: AgentState) -> dict:
     return {"user_context":user_context}
 
 def retrieve_medical_knowledge(state: AgentState) -> dict:
-    # medical_knowledge = medicalRepo.medical_knowledge("knowledge")
-    # return {"medical_knowledge": medical_knowledge}
-
-
     #Cautam in baza medical folosind intrebarea curenta a pacientului
     medical_knowledge=medicalRepo.get_knowledge(state["message"])
     return {"medical_knowledge":medical_knowledge}
 
 def generate_advice(state: AgentState) -> dict:
-
-    # judge_feedback = state["judge_feedback"]
-    # attempt = state["attempt"]
-    # response = advisorModel.getResponse("what should i do ?????")
-    # return {
-    #     "advice": response,
-    #     "attempt": attempt + 1,
-    # }
-
     attempt=state.get("attempt",0)
 
     system_template="""You are an empathetic and professional virtual medical assistant. 
@@ -238,12 +212,6 @@ def generate_advice(state: AgentState) -> dict:
 
 
 def judge_advice(state: AgentState) -> dict:
-
-    # judge_ouptput = judgeModel.getResponse("People die when they are killed")
-    # return {
-    #     "judge_feedback": "Pls do better, you stupid",
-    #     "judge_approved": "Ye",
-    # }
 
     #1.Strict System Prompt for the Judge
     judge_template="""You are a medical safety auditor (Judge).
