@@ -10,6 +10,9 @@ from JudgeModel import JudgeModel
 from MedicalKnowledgeRepo import MedicalKnowledgeRepo
 from UserKnowledgeRepo import UserKnowledgeRepo
 
+import json
+from langchain_core.prompts import ChatPromptTemplate
+
 medicalRepo = MedicalKnowledgeRepo()
 userRepo = UserKnowledgeRepo()
 judgeModel = JudgeModel()
@@ -34,10 +37,49 @@ class AgentState(TypedDict):
     final_response: str
 
 def classify_message(state: AgentState) -> dict:
-    #TODO dummy code, please erase
-    message_type = analyserModel.getResponse(state["message"]) #something like this
-    # can be "store_data" | "medical_advice" | "both" | "neither"
-    return {"message_type": message_type}
+    #Strict System Prompt for Intent Classification(Triage)
+    system_template="""You are a triage assistant in a medical application.
+        Your job is to analyze the user's message and determine their intent.
+        
+        The intent MUST be classified into exactly ONE of these four categories:
+        - "medical_advice": The user is asking for health tips, symptoms analysis, or medical information.
+        - "store_data": The user is providing personal health data (e.g., age, weight, medical history, current symptoms) to be saved in their profile, without explicitly asking for advice right now.
+        - "both": The user is providing personal data AND asking for medical advice in the same message.
+        - "neither": The message is unrelated to healthcare, data storage, or is just a general greeting.
+        
+        User's message: "{message}"
+        
+        Respond STRICTLY with a valid JSON object. Do not add any extra text or markdown formatting.
+        Expected JSON format:
+        {{
+            "message_type": "one of the four categories mentioned above"
+        }}
+        """
+
+    prompt=ChatPromptTemplate.from_messages([
+        ("system",system_template)
+    ])
+
+    formatted_prompt=prompt.format_messages(message=state["message"])
+
+    #Invoke the Analyser Model
+    response=analyserModel.getResponse(formatted_prompt)
+    raw_response=response.content if hasattr(response,"content") else str(response)
+
+    #Parse JSON safely and validate the output
+    try:
+        clean_json = raw_response.replace("```json", "").replace("```", "").strip()
+        parsed=json.loads(clean_json)
+        message_type=parsed.get("message_type","neither")
+
+        # Safety check: ensure the model didn't hallucinate a category
+        if message_type not in ["store_data","medical_advice","both","neither"]:
+            message_type="neither"
+    except Exception:
+        #Fallback in case of parsing error
+        message_type="neither"
+
+    return {"message_type":message_type}
 
 def route_by_intent(state: AgentState) -> str:
     intent = state["message_type"]
@@ -68,43 +110,155 @@ def prepare_retrieval(state: AgentState) -> dict:
     return {}
 
 def extract_user_info(state: AgentState) -> dict:
-    #TODO dummy code, please erase
-    extracted = analyserModel.getResponse("I think I'm dead")
-    return {"extracted_user_info": extracted}
+    #System Propmpt for Data Extraction
+    system_template="""You are a medical data extraction specialist.
+        Your job is to extract relevant personal and medical information from the user's message so it can be saved to their long-term health profile.
+        
+        Look for:
+        - Demographics (age, gender, weight, height)
+        - Medical history (past diseases, surgeries, allergies)
+        - Current symptoms (pain type, duration, severity, location)
+        - Current medications or treatments
+        
+        User's message: "{message}"
+        
+        Extract the information clearly and concisely as a summary list. 
+        If no relevant medical data is found, simply output "No new medical data provided."
+        Do NOT give medical advice here, your ONLY job is to extract facts.
+        """
+    prompt=ChatPromptTemplate.from_messages([
+        ("system",system_template)
+    ])
+
+    formatted_prompt=prompt.format_messages(message=state["message"])
+
+    #Invoke the Analyser Model
+    response=analyserModel.getResponse(formatted_prompt)
+    extracted_info=response.content if hasattr(response,"content") else str(response)
+
+    return {"extracted_user_info":extracted_info}
 
 def store_user_context(state: AgentState) -> dict:
-    # TODO dummy code, please erase
-    userRepo.save_knowledge("knowledge")
+    #Luăm informația extrasă de Analyser la pasul anterior
+    extracted_info=state.get("extracted_user_info","")
+
+    #Salvare fizica in JSON
+    userRepo.save_knowledge(extracted_info)
     return {}
 
 def retrieve_user_context(state: AgentState) -> dict:
-    # TODO dummy code, please erase
-    user_context = userRepo.get_knowledge("knowledge")
-    return {"user_context": user_context}
+    #Luăm informația extrasă de Analyser la pasul anterior
+    user_context=userRepo.get_knowledge()
+
+    #Punem datele în starea grafului pentru a fi folosite de Advisor
+    return {"user_context":user_context}
 
 def retrieve_medical_knowledge(state: AgentState) -> dict:
-    # TODO dummy code, please erase
-    medical_knowledge = medicalRepo.medical_knowledge("knowledge")
-    return {"medical_knowledge": medical_knowledge}
+    #Cautam in baza medical folosind intrebarea curenta a pacientului
+    medical_knowledge=medicalRepo.get_knowledge(state["message"])
+    return {"medical_knowledge":medical_knowledge}
 
 def generate_advice(state: AgentState) -> dict:
-    #TODO, dummy code, please erase
-    judge_feedback = state["judge_feedback"]
-    attempt = state["attempt"]
-    response = advisorModel.getResponse("what should i do ?????")
+    attempt=state.get("attempt",0)
+
+    system_template="""You are an empathetic and professional virtual medical assistant. 
+        Your role is to provide basic health advice, medical education, and support based STRICTLY on the provided medical knowledge.
+        You are NOT a real doctor. Do not provide final diagnoses or prescribe medications. Always recommend consulting a real doctor for emergencies.
+        
+        PATIENT INFORMATION (Context):
+        {user_context}
+        
+        RELEVANT MEDICAL KNOWLEDGE:
+        {medical_knowledge}
+        
+        {judge_section}
+        
+        Answer the user's latest question directly, considering the conversation history and the data provided above. Be concise and clear.
+        """
+
+    #Handle Judge feedback loop
+    judge_section=""
+    if attempt>0 and state.get("judge_feedback"):
+        judge_section=f"""
+            WARNING! Your previous response was rejected by the safety judge.
+            Judge Feedback: {state["judge_feedback"]}
+            Please correct your response according to this feedback!
+        """
+
+    #Build the Prompt Template
+    prompt_template=ChatPromptTemplate.from_messages([
+        ("system",system_template),
+        ("user","{message}")
+    ])
+
+    #Inject actual state variable into the prompt
+    formatted_prompt=prompt_template.format_messages(
+        user_context=state.get("user_context","No patient data available"),
+        medical_knowledge=state.get("medical_knowledge","No specific medical knowledge found"),
+        judge_section=judge_section,
+        message=state["message"]
+    )
+
+    #invoke the Advisor Model
+    response=advisorModel.getResponse(formatted_prompt)
+
+    #Extract raw text from LangChain AIMessage
+    advice_text=response.content if hasattr(response,'content') else str(response)
+
     return {
-        "advice": response,
-        "attempt": attempt + 1,
+        "advice":advice_text,
+        "attempt":attempt+1
     }
+
 
 def judge_advice(state: AgentState) -> dict:
-    # TODO dummy code, please erase
-    judge_ouptput = judgeModel.getResponse("People die when they are killed")
-    return {
-        "judge_feedback": "Pls do better, you stupid",
-        "judge_approved": "Ye",
-    }
 
+    #1.Strict System Prompt for the Judge
+    judge_template="""You are a medical safety auditor (Judge).
+        Your task is to evaluate the advice given by a virtual assistant (Advisor) to a patient.
+        
+        STRICT SAFETY RULES:
+        1. The assistant MUST NOT provide a final diagnosis.
+        2. The assistant MUST NOT prescribe medications.
+        3. If the situation sounds like an emergency (e.g., severe chest pain, heavy bleeding), the assistant MUST recommend calling emergency services or visiting a doctor immediately.
+        
+        Assistant's Advice to evaluate:
+        "{advice}"
+        
+        Evaluate if this advice strictly follows the rules. 
+        You MUST respond STRICTLY with a valid JSON object. Do not include any other text, markdown formatting (like ```json), or explanations outside the JSON.
+        
+        Expected JSON format:
+        {{
+            "judge_approved": true or false,
+            "judge_feedback": "Your short explanation of why you approved or rejected the advice."
+        }}
+        """
+
+    prompt=ChatPromptTemplate.from_messages([
+        ("system",judge_template)
+    ])
+    formatted_prompt=prompt.format_messages(advice=state["advice"])
+
+    response=judgeModel.getResponse(formatted_prompt)
+
+    raw_response=response.content if hasattr(response,"content") else str(response)
+
+    #Parse the JSON output
+    try:
+        clean_json=raw_response.replace("```json", "").replace("```", "").strip()
+        evaluation=json.loads(clean_json)
+
+        approved=evaluation.get("judge_approved",False)
+        feedback=evaluation.get("judge_feedback","Could not parse judge feedback")
+    except Exception as e:
+        approved=False
+        feedback=f"Judge parsing error: {str(e)}. Please be safer and more cautious."
+
+    return {
+        "judge_feedback":feedback,
+        "judge_approved":approved
+    }
 
 def route_after_judge(state: AgentState) -> str:
     if state["judge_approved"]:
