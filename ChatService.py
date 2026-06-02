@@ -98,12 +98,10 @@ def route_after_store(state: AgentState) -> str:
         return "prepare_retrieval"
 
 def confirm_store(state: AgentState) -> dict:
-    # TODO dummy code, please erase
-    return {"final_response": "stored the data"}
+    return {"final_response": "Ok. I'll remember that"}
 
 def handle_neither(state: AgentState) -> dict:
-    # TODO dummy code, please erase
-    return {"final_response": "I dont know what you want"}
+    return {"final_response": "Sorry, I can only help with medical questions or storing your health data. If you have a medical question or want to update your health profile, just let me know!"}
 
 def prepare_retrieval(state: AgentState) -> dict:
     # nothing, intermediary node
@@ -271,8 +269,7 @@ def finalize_response(state: AgentState) -> dict:
     return {"final_response": state["advice"]}
 
 def fallback_response(state: AgentState) -> dict:
-    # TODO dummy code, please erase
-    return {"final_response": "Sorry I'm dumb"}
+    return {"final_response": "Sorry, but I'm not able to help you with that. If you're worried you should go see a doctor."}
 
 def build_graph() -> CompiledStateGraph:
     graph = StateGraph(AgentState)
