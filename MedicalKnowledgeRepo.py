@@ -35,8 +35,13 @@ class LocalServerEmbeddings(Embeddings):
 
         return [item["embedding"] for item in data["data"]]
 
-    def embed_documents(self,texts:List[str])->List[List[float]]:
-        return self._embed(texts)
+    def embed_documents(self,texts:List[str],batch_size:int=50)->List[List[float]]:
+        all_embeddings=[]
+        for i in range(0,len(texts),batch_size):
+            batch=texts[i:i+batch_size]
+            print(f"Embedding batch {i//batch_size+1}/{(len(texts)-1)//batch_size+1} ({len(batch)} texts)...")
+            all_embeddings.extend(self._embed(batch))
+        return all_embeddings
 
     def embed_query(self,text:str)->List[float]:
         return self._embed([text])[0]
@@ -53,7 +58,7 @@ class MedicalKnowledgeRepo():
             embedding_function=self.embedding_model
         )
 
-    def seed_database(self,texts:List[str],metadatas:List[dict]=None):
+    def seed_database(self,texts:List[str],metadatas:List[dict]=None,batch_size:int=5000):
         """
             Metodă utilitară pentru a popula baza de date cu documente medicale.
             Trebuie rulată o singură dată (sau când adaugam documente noi).
@@ -62,11 +67,21 @@ class MedicalKnowledgeRepo():
             metadatas=[{}]*len(texts)
 
         documents=[Document(page_content=t,metadata=m) for t,m in zip(texts,metadatas)]
-        self.vectordb.add_documents(documents)
-        print(f"S-au adăugat {len(documents)} fragmente în ChromaDB.")
+
+        total_batches=(len(documents)-1)//batch_size+1
+        inserted=0
+        for i in range(0,len(documents),batch_size):
+            batch=documents[i:i+batch_size]
+            batch_num=i//batch_size+1
+            print(f"Adding batch {batch_num}/{total_batches} ({len(batch)} documents)...")
+            self.vectordb.add_documents(batch)
+            inserted+=len(batch)
+            print(f"  ✓ Batch {batch_num} done — {inserted}/{len(documents)} total inserted")
+
+        print(f"\nFinished! S-au adăugat {inserted} fragmente în ChromaDB.")
 
 
-    def get_knowledge(self, query:str,k:int=2)->str:
+    def get_knowledge(self, query:str,k:int=5)->str:
         """
             Caută în ChromaDB cele mai relevante 'k' fragmente de text pe baza întrebării.
         """
