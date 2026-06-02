@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 
 class UserKnowledgeRepo():
     def __init__(self,filepath="user_profile.json"):
@@ -36,3 +37,16 @@ class UserKnowledgeRepo():
 
         with open(self.filepath,"w",encoding="utf-8") as f:
             json.dump(data,f,ensure_ascii=False,indent=4)
+
+    def save_conversation_summary(self, user_message: str, assistant_response: str):
+        """Save a conversation turn summary to the patient profile for long-term memory"""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+        summary = f"[Conversation on {timestamp}] Patient asked: \"{user_message[:300]}\" → Assistant advised: \"{assistant_response[:300]}\""
+
+        with open(self.filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data.append(summary)
+
+        with open(self.filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
