@@ -6,18 +6,34 @@ set -e
 echo "=== 🚀 Starting LangChain to LM Studio Bridge Setup ==="
 
 # -----------------------------------------------------------
+# SET YOUR PREFERRED PYTHON VERSION HERE
+# -----------------------------------------------------------
+# Change this to "python3.10", "python3.11", or the full path
+# like "/opt/homebrew/bin/python3.11"
+PYTHON_EXE="python3.12"
+
+# -----------------------------------------------------------
 # 1. Python Backend Dependencies Setup
 # -----------------------------------------------------------
 echo ""
 echo "=== 🐍 Setting up Python Backend Dependencies ==="
+
+# Check if the requested Python version actually exists
+if ! command -v $PYTHON_EXE &> /dev/null; then
+    echo "❌ Error: $PYTHON_EXE was not found on your system."
+    echo "Please install it via Homebrew (brew install python@3.11) or specify a different path."
+    exit 1
+fi
 
 # Check if running inside a Conda environment, otherwise create a python venv
 if [ -n "$CONDA_DEFAULT_ENV" ]; then
     echo "Detected active Conda environment: $CONDA_DEFAULT_ENV"
     echo "Installing Python packages via pip inside Conda..."
 else
-    echo "No Conda detected. Creating a standard Python virtual environment (.venv)..."
-    python3 -m venv .venv
+    echo "Creating virtual environment using: $($PYTHON_EXE --version)"
+    # Delete old .venv if it exists to avoid version conflicts
+    rm -rf .venv
+    $PYTHON_EXE -m venv .venv
     source .venv/bin/activate
 fi
 

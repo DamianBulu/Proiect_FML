@@ -2,5 +2,5 @@ from Model import Model
 
 
 class AnalyserModel(Model):
-    def __init__(self, model="lmstudio-community/medgemma-4b-it-MLX-4bit", temperature=0.1):
+    def __init__(self, model="lmstudio-community/meta-llama-3.1-8b-instruct", temperature=0.1):
         super().__init__(model, temperature)
